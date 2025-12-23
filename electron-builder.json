@@ -1,0 +1,52 @@
+{
+  "appId": "com.dbod.launcher",
+  "productName": "DBOD Launcher",
+  "icon": "public/Icon.ico",
+  "directories": {
+    "output": "dist-electron"
+  },
+  "files": [
+    "main.js",
+    "preload.js",
+    "dist/**/*",
+    "public/**/*",
+    "node_modules/**/*"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      },
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "requestedExecutionLevel": "asInvoker",
+    "icon": "public/Icon.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "DBOD Launcher"
+  },
+  "portable": {
+    "artifactName": "DBOD-Launcher.exe"
+  },
+  "extraResources": [
+    {
+      "from": "public",
+      "to": "public"
+    }
+  ],
+  "publish": {
+    "provider": "github",
+    "owner": "kuini-1",
+    "repo": "DBOD-Launcher",
+    "private": true,
+    "releaseType": "release"
+  }
+} 

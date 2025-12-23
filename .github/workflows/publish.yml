@@ -1,0 +1,27 @@
+name: Publish Launcher
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Publish to GitHub
+      env:
+        GH_TOKEN: ${{ secrets.LAUNCHER }}
+      run: npm run publish:github 
