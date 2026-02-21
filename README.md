@@ -25,6 +25,9 @@ A compact, modern launcher for Dragon Ball Online with auto-update capabilities,
 
 ```
 DBOD-Launcher/
+├── docs/
+│   ├── UPDATES_GUIDE.md  # Launcher and game update setup
+│   └── VERSION_GUIDE.md  # Version display and release workflow
 ├── src/
 │   ├── App.js          # Main launcher component
 │   ├── index.js        # React entry point
@@ -71,6 +74,26 @@ npm install
    ```bash
    npm run dev
    ```
+
+## Building
+
+### Portable Executable (Recommended)
+
+```bash
+npm install
+npm run build
+npm run dist:portable
+```
+
+**Output**: `dist-electron/DBOD-Launcher.exe`
+
+### Build Options
+
+- `npm run dist:portable` - Single portable executable for game folder
+- `npm run dist:win` - Windows installer
+- `npm run dist` - All configured platforms
+
+Copy `DBOD-Launcher.exe` to your game folder. The launcher creates `game-version.txt` and needs write permissions for updates. See [docs/UPDATES_GUIDE.md](docs/UPDATES_GUIDE.md) for update server setup.
 
 ## Features
 
@@ -141,6 +164,11 @@ The build process creates a `dist/` folder containing:
 - `index.html` - The main HTML file
 - `bundle.js` - The compiled JavaScript bundle
 - Font files for PrimeIcons
+
+## Documentation
+
+- [docs/UPDATES_GUIDE.md](docs/UPDATES_GUIDE.md) — Launcher and game update setup
+- [docs/VERSION_GUIDE.md](docs/VERSION_GUIDE.md) — Version display and release workflow
 
 ## Notes
 
