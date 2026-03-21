@@ -33,8 +33,20 @@ function App() {
           if (status.includes('Checking') || status.includes('Downloading') || status.includes('Installing') || status.includes('Found')) {
             setAutoUpdateStatus('🔄 Auto-updating...');
             setIsUpdating(true);
-          } else if (status.includes('successfully') || status.includes('up to date') || status.includes('No updates')) {
-            setAutoUpdateStatus('✅ Auto-updates ready');
+          } else if (
+            status.includes('successfully') ||
+            status.includes('up to date') ||
+            status.includes('No updates') ||
+            status.toLowerCase().includes('failed') ||
+            status.toLowerCase().includes('error')
+          ) {
+            const isError =
+              status.toLowerCase().includes('failed') ||
+              status.toLowerCase().includes('error');
+
+            setAutoUpdateStatus(
+              isError ? `⚠️ Auto-update issue: ${status}` : '✅ Auto-updates ready'
+            );
             setIsUpdating(false);
             setUpdateProgress(0);
           }

@@ -14,7 +14,7 @@ async function performAutoGameUpdate() {
   }
   
   try {
-    const baseUrl = 'http://46.250.226.112/updates';
+    const baseUrl = 'https://updates.dbod.cc';
     const selectedLanguage = 'EN'; // Default language
     
 
@@ -130,65 +130,80 @@ async function performAutoGameUpdate() {
           writer.on('error', reject);
         });
         
-
-        
-                         // Extract the update
+        // Extract the update
         const extractPath = gameDir; // Extract to game directory, not launcher directory
 
-         
-         try {
-           const zip = new AdmZip(downloadPath);
-           const zipEntries = zip.getEntries();
-
-           
-
-           
-           // Extract the main update zip to the pack folder
-           const packDir = path.join(extractPath, 'pack');
-           await fs.ensureDir(packDir); // Create pack directory if it doesn't exist
-           
-           zip.extractAllTo(packDir, true);
-
-           
-           // Clean up the downloaded zip file
-           await fs.remove(downloadPath);
-
-         } catch (extractError) {
-           console.error(`Auto-update: Extraction failed: ${extractError.message}`);
-           console.error(`Auto-update: Extract error stack: ${extractError.stack}`);
-           throw extractError;
-         }
-        
-        // Verify the folder structure
         const packPath = path.join(extractPath, 'pack');
         const localizePath = path.join(extractPath, 'localize');
         const localizeTaiwanPath = path.join(localizePath, 'TAIWAN');
         const localizePackPath = path.join(localizeTaiwanPath, 'pack');
-        
 
-         
-         const packExists = await fs.pathExists(packPath);
-         const localizeExists = await fs.pathExists(localizePath);
-         const localizeTaiwanExists = await fs.pathExists(localizeTaiwanPath);
-         const localizePackExists = await fs.pathExists(localizePackPath);
-         
+        try {
+          if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('game-update-status', `Extracting update ${update.version}...`);
+          }
 
-         
-         const structureValid = packExists && localizeExists && localizeTaiwanExists && localizePackExists;
-         
-         if (!structureValid) {
-                    console.error('Auto-update: Invalid folder structure detected');
-         // List what's actually in the extractPath
-         const files = await fs.readdir(extractPath);
-         console.log(`Auto-update: Files in extractPath: ${files.join(', ')}`);
-           throw new Error('Invalid update folder structure');
-         }
+          const zip = new AdmZip(downloadPath);
+          const entries = zip.getEntries();
+
+          // Detect zip structure: does it have pack/ or localize/ with actual content?
+          // Some zips add an empty "pack" folder entry but put files at root - we must not treat that as having pack.
+          const hasTopLevelPack = entries.some(e => {
+            const name = e.entryName.replace(/\\/g, '/').toLowerCase();
+            return (name.startsWith('pack/') && name.length > 5) || (name.startsWith('localize/') && name.length > 9);
+          });
+
+          // If zip has pack/ or localize/ at root with content -> extract to gameDir.
+          // If zip has files at root only -> extract to packDir so files land in pack/.
+          const targetExtractPath = hasTopLevelPack ? extractPath : packPath;
+          zip.extractAllTo(targetExtractPath, true);
+
+          // If we extracted to gameDir, check for root-level files (zip had localize/ but game files at root).
+          // Move any root-level files into pack/ so the game can find them.
+          if (hasTopLevelPack) {
+            const rootItems = await fs.readdir(extractPath, { withFileTypes: true });
+            const rootFilesToMove = rootItems.filter(
+              i => i.name !== 'pack' && i.name !== 'localize' && !i.name.startsWith('.') && i.name !== 'game-version.txt' && i.name !== 'game-update.zip'
+            );
+            if (rootFilesToMove.length > 0) {
+              await fs.ensureDir(packPath);
+              for (const item of rootFilesToMove) {
+                const src = path.join(extractPath, item.name);
+                const dest = path.join(packPath, item.name);
+                await fs.move(src, dest, { overwrite: true });
+              }
+            }
+          }
+
+          // Ensure the pack directory exists after extraction (required for the game to run).
+          const packExists = await fs.pathExists(packPath);
+          if (!packExists) {
+            console.error('Auto-update: Required "pack" folder not found after extraction');
+            throw new Error('Invalid update folder structure: missing "pack" folder');
+          }
+
+          // Ensure localize/TAIWAN/pack directory exists for language files,
+          // even if the base update zip only provided "localize/pack".
+          await fs.ensureDir(localizePackPath);
+
+        } catch (extractError) {
+          console.error(`Auto-update: Extraction failed: ${extractError.message}`);
+          console.error(`Auto-update: Extract error stack: ${extractError.stack}`);
+          throw extractError;
+        } finally {
+          // Always try to clean up the downloaded zip file
+          try {
+            await fs.remove(downloadPath);
+          } catch (cleanupError) {
+            console.warn('Auto-update: Failed to remove temporary game-update.zip:', cleanupError.message);
+          }
+        }
         
         // Download language-specific localization file
         const languageFile = `${selectedLanguage.toLowerCase()}.zip`;
         const languageUrl = `${baseUrl}/localize/${languageFile}`;
         
-                 try {
+        try {
           // Get language file size first
           const languageHeadResponse = await axios.head(languageUrl);
           const languageTotalSize = parseInt(languageHeadResponse.headers['content-length'] || 0);
@@ -260,6 +275,10 @@ async function performAutoGameUpdate() {
   } catch (error) {
     console.error('Auto-update failed:', error);
     console.error('Error stack:', error.stack);
+    if (mainWindow && mainWindow.webContents) {
+      const message = error && error.message ? error.message : 'Unknown error';
+      mainWindow.webContents.send('game-update-status', `Game auto-update failed: ${message}`);
+    }
   }
 }
 
@@ -305,7 +324,7 @@ function createWindow() {
 }
 
 // Custom update configuration
-const UPDATE_SERVER = 'http://46.250.226.112/launcher-updates';
+const UPDATE_SERVER = 'https://launcher.dbod.cc';
 
 // Custom update checker
 async function checkForLauncherUpdates() {
@@ -660,7 +679,7 @@ ipcMain.handle('download-language-version', async (event, languageCode, language
     };
     
     const languageFileName = languageFileMap[languageCode] || languageCode.toLowerCase();
-    const baseUrl = 'http://46.250.226.112/updates';
+    const baseUrl = 'https://updates.dbod.cc';
     const languageUrl = `${baseUrl}/localize/${languageFileName}.zip`;
     
     console.log(`Downloading language file from: ${languageUrl}`);
@@ -944,28 +963,31 @@ ipcMain.handle('extract-game-update', async (event, downloadPath, selectedLangua
 
     const gameDir = path.dirname(app.getPath('exe')); // Use the directory where the launcher executable is located
     const extractPath = gameDir;
-    
-    // Extract the zip file
-    const zip = new AdmZip(downloadPath);
-    zip.extractAllTo(extractPath, true);
-    
-    // Clean up the downloaded zip file
-    await fs.remove(downloadPath);
-    
-    // Verify the folder structure
     const packPath = path.join(extractPath, 'pack');
     const localizePath = path.join(extractPath, 'localize');
     const localizeTaiwanPath = path.join(localizePath, 'TAIWAN');
     const localizePackPath = path.join(localizeTaiwanPath, 'pack');
-    
-    const structureValid = await fs.pathExists(packPath) && 
-                          await fs.pathExists(localizePath) && 
-                          await fs.pathExists(localizeTaiwanPath) &&
-                          await fs.pathExists(localizePackPath);
-    
-    if (!structureValid) {
-      throw new Error('Invalid update folder structure');
+
+    // Detect zip structure: if zip has files at root (no pack/ or localize/), extract into pack/
+    const zip = new AdmZip(downloadPath);
+    const entries = zip.getEntries();
+    const hasTopLevelPack = entries.some(e => {
+      const name = e.entryName.replace(/\\/g, '/').toLowerCase();
+      return (name.startsWith('pack/') && name.length > 5) || (name.startsWith('localize/') && name.length > 9);
+    });
+    const targetExtractPath = hasTopLevelPack ? extractPath : packPath;
+
+    zip.extractAllTo(targetExtractPath, true);
+
+    // Clean up the downloaded zip file
+    await fs.remove(downloadPath);
+
+    // Require pack folder; ensure localize/TAIWAN/pack exists for language zips
+    const packExists = await fs.pathExists(packPath);
+    if (!packExists) {
+      throw new Error('Invalid update folder structure: missing "pack" folder');
     }
+    await fs.ensureDir(localizePackPath);
     
     // Download language-specific localization file
     const languageFile = `${selectedLanguage.toLowerCase()}.zip`;
