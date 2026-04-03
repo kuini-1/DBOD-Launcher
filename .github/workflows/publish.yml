@@ -11,17 +11,22 @@ jobs:
     
     steps:
     - uses: actions/checkout@v3
-    
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 8
+
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '16'
-        cache: 'npm'
-    
+        cache: 'pnpm'
+
     - name: Install dependencies
-      run: npm install
-    
+      run: pnpm install --frozen-lockfile
+
     - name: Publish to GitHub
       env:
         GH_TOKEN: ${{ secrets.LAUNCHER }}
-      run: npm run publish:github 
+      run: pnpm run publish:github

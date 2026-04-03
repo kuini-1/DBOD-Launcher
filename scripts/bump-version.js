@@ -47,6 +47,6 @@ console.log(`   git tag v${newVersion}`);
 console.log(`   git push origin v${newVersion}`);
 console.log('');
 console.log('3. Publish to GitHub:');
-console.log('   npm run publish:github');
+console.log('   pnpm run publish:github');
 console.log('');
 console.log('Or let GitHub Actions handle it automatically when you push the tag!'); 

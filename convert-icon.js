@@ -21,4 +21,4 @@ console.log('- Format: ICO (Windows icon format)');
 console.log('- File: public/Logo.ico');
 console.log('');
 console.log('Current configuration uses: public/Logo.ico');
-console.log('Build with: npm run dist:portable'); 
+console.log('Build with: pnpm run dist:portable'); 

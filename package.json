@@ -3,6 +3,7 @@
   "version": "1.0.5",
   "description": "Dragon Ball Online Launcher with Auto-Update",
   "main": "main.js",
+  "packageManager": "pnpm@8.15.9",
   "dependencies": {
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
@@ -33,18 +34,18 @@
     "webpack-dev-server": "^4.5.0"
   },
   "scripts": {
-    "start": "npm run build && electron .",
+    "start": "pnpm run build && electron .",
     "dev": "webpack serve --mode development",
-    "dev:electron": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "dev:electron": "concurrently \"pnpm run dev\" \"wait-on http://localhost:3000 && electron .\"",
     "build": "webpack --mode production",
     "watch": "webpack --mode development --watch",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:portable": "npm run build && electron-builder --win portable",
-    "publish:github": "npm run build && electron-builder --win portable --publish always",
-    "publish:github:win": "npm run build && electron-builder --win --publish always",
-    "publish:github:all": "npm run build && electron-builder --publish always",
+    "dist": "pnpm run build && electron-builder",
+    "dist:win": "pnpm run build && electron-builder --win",
+    "dist:portable": "pnpm run build && electron-builder --win portable",
+    "publish:github": "pnpm run build && electron-builder --win portable --publish always",
+    "publish:github:win": "pnpm run build && electron-builder --win --publish always",
+    "publish:github:all": "pnpm run build && electron-builder --publish always",
     "update-version": "node scripts/update-version.js"
   },
   "keywords": [

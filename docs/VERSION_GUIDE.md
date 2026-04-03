@@ -24,7 +24,7 @@ The launcher shows **"DBOD - 1.0.x"** in the title bar. The version is read from
 
 2. **Build and upload:**
    ```bash
-   npm run dist:portable
+   pnpm run dist:portable
    ```
    Upload `DBOD-Launcher.exe` to your launcher-updates folder.
 
@@ -54,7 +54,7 @@ Then build and publish as usual.
 ### Sync Version Display (if needed)
 
 ```bash
-npm run update-version
+pnpm run update-version
 ```
 
 ## Server Structure

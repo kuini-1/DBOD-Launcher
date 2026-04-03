@@ -47,32 +47,32 @@ DBOD-Launcher/
 
 ### Prerequisites
 
-- Node.js v14
-- npm v6+
+- Node.js v14+
+- [pnpm](https://pnpm.io/installation) 8.x (see `packageManager` in [package.json](package.json))
 
 ### Installation
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### Available Scripts
 
-- `npm start` - Build and start the launcher
-- `npm run dev` - Start webpack dev server
-- `npm run build` - Build for production
-- `npm run watch` - Build in watch mode
+- `pnpm start` - Build and start the launcher
+- `pnpm run dev` - Start webpack dev server
+- `pnpm run build` - Build for production
+- `pnpm run watch` - Build in watch mode
 
 ### Development Workflow
 
 1. **For production build and run:**
    ```bash
-   npm start
+   pnpm start
    ```
 
 2. **For development:**
    ```bash
-   npm run dev
+   pnpm run dev
    ```
 
 ## Building
@@ -80,18 +80,18 @@ npm install
 ### Portable Executable (Recommended)
 
 ```bash
-npm install
-npm run build
-npm run dist:portable
+pnpm install
+pnpm run build
+pnpm run dist:portable
 ```
 
 **Output**: `dist-electron/DBOD-Launcher.exe`
 
 ### Build Options
 
-- `npm run dist:portable` - Single portable executable for game folder
-- `npm run dist:win` - Windows installer
-- `npm run dist` - All configured platforms
+- `pnpm run dist:portable` - Single portable executable for game folder
+- `pnpm run dist:win` - Windows installer
+- `pnpm run dist` - All configured platforms
 
 Copy `DBOD-Launcher.exe` to your game folder. The launcher creates `game-version.txt` and needs write permissions for updates. See [docs/UPDATES_GUIDE.md](docs/UPDATES_GUIDE.md) for update server setup.
 

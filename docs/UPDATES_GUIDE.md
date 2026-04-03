@@ -27,7 +27,7 @@ This guide covers launcher updates and game updates.
 
 3. **Build and publish:**
    ```bash
-   npm run publish:github
+   pnpm run publish:github
    ```
 
 The launcher uses electron-updater to check GitHub releases. Users get updates automatically on startup.
@@ -136,7 +136,7 @@ launcher-directory/
 
 | Task | Action |
 |------|--------|
-| Launcher (GitHub) | `npm run publish:github` |
+| Launcher (GitHub) | `pnpm run publish:github` |
 | Launcher (custom) | Build, upload exe, update latest.json on your server |
 | Game updates | Create update-N.zip, upload to /updates/, set baseUrl in App.js |
 | Version display | Edit package.json; launcher reads it at runtime |

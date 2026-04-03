@@ -29,7 +29,7 @@ console.log('4. Export as ICO');
 console.log('');
 console.log('After resizing:');
 console.log('1. Replace public/Logo.ico with 256x256 version');
-console.log('2. Run: npm run dist:portable');
+console.log('2. Run: pnpm run dist:portable');
 console.log('3. Check the executable icon');
 console.log('');
 console.log('Current icon dimensions: 255x256');
