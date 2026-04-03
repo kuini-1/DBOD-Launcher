@@ -6,6 +6,41 @@ const fs = require('fs-extra');
 const AdmZip = require('adm-zip');
 const axios = require('axios');
 
+const VALID_GAME_LOCALES = new Set(['EN', 'KR', 'CN']);
+
+function getGameDirForLauncher() {
+  if (process.env.PORTABLE_EXECUTABLE_DIR) {
+    return process.env.PORTABLE_EXECUTABLE_DIR;
+  }
+  return path.dirname(process.execPath);
+}
+
+/** game-version.txt: line 1 = version number, line 2 = EN | KR | CN */
+function parseGameVersionFile(content) {
+  if (content == null || String(content).trim() === '') {
+    return { version: 0, locale: 'EN' };
+  }
+  const lines = String(content)
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  let version = parseInt(lines[0], 10);
+  if (Number.isNaN(version)) version = 0;
+  let locale = 'EN';
+  if (lines.length >= 2) {
+    const raw = lines[1].toUpperCase();
+    if (VALID_GAME_LOCALES.has(raw)) locale = raw;
+  }
+  return { version, locale };
+}
+
+function formatGameVersionFile(version, locale) {
+  const loc = VALID_GAME_LOCALES.has(String(locale).toUpperCase())
+    ? String(locale).toUpperCase()
+    : 'EN';
+  return `${version}\n${loc}\n`;
+}
+
 // Auto update function
 async function performAutoGameUpdate() {
   console.log('=== AUTO-UPDATE FUNCTION CALLED ===');
@@ -15,41 +50,31 @@ async function performAutoGameUpdate() {
   
   try {
     const baseUrl = 'https://updates.dbod.cc';
-    const selectedLanguage = 'EN'; // Default language
-    
 
-    
-
-    
-    // Get current version from a local file or default to 0
-    // Try to get the actual game directory where the launcher was placed
-    let gameDir;
-    
-    // Try PORTABLE_EXECUTABLE_DIR first (this should be the actual directory)
+    const gameDir = getGameDirForLauncher();
     if (process.env.PORTABLE_EXECUTABLE_DIR) {
-      gameDir = process.env.PORTABLE_EXECUTABLE_DIR;
       console.log('Using PORTABLE_EXECUTABLE_DIR:', gameDir);
       if (mainWindow && mainWindow.webContents) {
         mainWindow.webContents.send('game-update-status', `Using PORTABLE_EXECUTABLE_DIR: ${gameDir}`);
       }
     } else {
-      // Fallback to executable directory
-      const exePath = process.execPath;
-      const exeDir = path.dirname(exePath);
-      gameDir = exeDir;
-      console.log('Using executable directory (fallback):', gameDir);
+      console.log('Using executable directory:', gameDir);
       if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('game-update-status', `Using executable directory (fallback): ${gameDir}`);
+        mainWindow.webContents.send('game-update-status', `Using executable directory: ${gameDir}`);
       }
     }
+
     const versionFile = path.join(gameDir, 'game-version.txt');
     let currentVersion = 0;
-    
+    let selectedLanguage = 'EN';
+
     try {
       const versionData = await fs.readFile(versionFile, 'utf8');
-      currentVersion = parseInt(versionData.trim()) || 0;
+      const parsed = parseGameVersionFile(versionData);
+      currentVersion = parsed.version;
+      selectedLanguage = parsed.locale;
     } catch (error) {
-      // Version file doesn't exist, start from 0
+      // Version file doesn't exist, start from 0 / default locale
     }
     
 
@@ -253,8 +278,8 @@ async function performAutoGameUpdate() {
           // Continue with the update even if language file fails
         }
         
-        // Update the version file
-        await fs.writeFile(versionFile, update.version.toString());
+        // Update the version file (keep locale line)
+        await fs.writeFile(versionFile, formatGameVersionFile(update.version, selectedLanguage));
         
         if (mainWindow && mainWindow.webContents) {
           mainWindow.webContents.send('game-update-status', `Update ${update.version} completed successfully`);
@@ -658,18 +683,23 @@ ipcMain.handle('get-app-version', () => {
 //   }
 // });
 
+ipcMain.handle('get-game-version-file', async () => {
+  try {
+    const gameDir = getGameDirForLauncher();
+    const versionFile = path.join(gameDir, 'game-version.txt');
+    const data = await fs.readFile(versionFile, 'utf8');
+    const parsed = parseGameVersionFile(data);
+    return { success: true, version: parsed.version, locale: parsed.locale };
+  } catch (e) {
+    return { success: true, version: 0, locale: 'EN' };
+  }
+});
+
 ipcMain.handle('download-language-version', async (event, languageCode, languageName) => {
   try {
     console.log(`Downloading ${languageCode} (${languageName}) language files...`);
-    
-    // Get the launcher's directory
-    let launcherDir;
-    if (process.env.PORTABLE_EXECUTABLE_DIR) {
-      launcherDir = process.env.PORTABLE_EXECUTABLE_DIR;
-    } else {
-      const exePath = process.execPath;
-      launcherDir = path.dirname(exePath);
-    }
+
+    const launcherDir = getGameDirForLauncher();
     
     // Define the language file mapping
     const languageFileMap = {
@@ -738,6 +768,16 @@ ipcMain.handle('download-language-version', async (event, languageCode, language
     
     // Clean up the downloaded zip file
     await fs.remove(downloadPath);
+
+    const versionFile = path.join(launcherDir, 'game-version.txt');
+    let version = 0;
+    try {
+      const vf = await fs.readFile(versionFile, 'utf8');
+      version = parseGameVersionFile(vf).version;
+    } catch (e) {
+      // no version file yet
+    }
+    await fs.writeFile(versionFile, formatGameVersionFile(version, languageCode));
     
     console.log(`${languageCode} language files downloaded and extracted successfully`);
     
@@ -856,14 +896,13 @@ ipcMain.handle('get-available-updates', async (event, baseUrl, selectedLanguage)
       mainWindow.webContents.send('game-update-status', 'Checking for available updates...');
     }
     
-    // Get current version from a local file or default to 0
-    const gameDir = path.dirname(app.getPath('exe')); // Use the directory where the launcher executable is located
+    const gameDir = getGameDirForLauncher();
     const versionFile = path.join(gameDir, 'game-version.txt');
     let currentVersion = 0;
-    
+
     try {
       const versionData = await fs.readFile(versionFile, 'utf8');
-      currentVersion = parseInt(versionData.trim()) || 0;
+      currentVersion = parseGameVersionFile(versionData).version;
     } catch (error) {
       // Version file doesn't exist, start from 0
     }
@@ -916,7 +955,7 @@ ipcMain.handle('download-game-update', async (event, updateUrl) => {
       mainWindow.webContents.send('game-update-status', 'Downloading game update...');
     }
 
-    const gameDir = path.dirname(app.getPath('exe')); // Use the directory where the launcher executable is located
+    const gameDir = getGameDirForLauncher();
     const downloadPath = path.join(gameDir, 'game-update.zip');
     
     // Download the update file
@@ -961,7 +1000,7 @@ ipcMain.handle('extract-game-update', async (event, downloadPath, selectedLangua
       mainWindow.webContents.send('game-update-status', 'Extracting game update...');
     }
 
-    const gameDir = path.dirname(app.getPath('exe')); // Use the directory where the launcher executable is located
+    const gameDir = getGameDirForLauncher();
     const extractPath = gameDir;
     const packPath = path.join(extractPath, 'pack');
     const localizePath = path.join(extractPath, 'localize');
@@ -1050,7 +1089,7 @@ ipcMain.handle('install-game-update', async (event, version) => {
       mainWindow.webContents.send('game-update-status', 'Installing game update...');
     }
 
-    const gameDir = path.dirname(app.getPath('exe')); // Use the directory where the launcher executable is located
+    const gameDir = getGameDirForLauncher();
     const packPath = path.join(gameDir, 'pack');
     const localizePath = path.join(gameDir, 'localize');
     
@@ -1065,9 +1104,15 @@ ipcMain.handle('install-game-update', async (event, version) => {
       throw new Error('Update files not found in expected locations');
     }
     
-    // Update the version file
     const versionFile = path.join(gameDir, 'game-version.txt');
-    await fs.writeFile(versionFile, version.toString());
+    let locale = 'EN';
+    try {
+      const existing = await fs.readFile(versionFile, 'utf8');
+      locale = parseGameVersionFile(existing).locale;
+    } catch (e) {
+      // no file yet
+    }
+    await fs.writeFile(versionFile, formatGameVersionFile(version, locale));
     
     return { 
       success: true, 

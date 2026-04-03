@@ -19,7 +19,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openGameDirectory: () => ipcRenderer.invoke('open-game-directory'),
   
   // Language version download
-  downloadLanguageVersion: (language) => ipcRenderer.invoke('download-language-version', language),
+  downloadLanguageVersion: (languageCode, languageName) =>
+    ipcRenderer.invoke('download-language-version', languageCode, languageName),
+
+  getGameVersionFile: () => ipcRenderer.invoke('get-game-version-file'),
   
   // Game update functions
   checkGameUpdate: (updateUrl) => ipcRenderer.invoke('check-game-update', updateUrl),

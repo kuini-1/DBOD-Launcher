@@ -6,7 +6,6 @@ import './LauncherUpdate.css';
 function App() {
   const [gameStatus, setGameStatus] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState(() => {
-    // Load saved language from localStorage, default to 'EN'
     return localStorage.getItem('selectedLanguage') || 'EN';
   });
   const [gameUpdateStatus, setGameUpdateStatus] = useState('');
@@ -20,6 +19,17 @@ function App() {
     { label: 'KR', value: 'korean' },
     { label: 'EN', value: 'english' }
   ];
+
+  // Restore language from game-version.txt (line 2: EN | KR | CN) on launcher load
+  useEffect(() => {
+    if (!window.electronAPI?.getGameVersionFile) return;
+    window.electronAPI.getGameVersionFile().then((res) => {
+      if (res?.success && res.locale && ['EN', 'KR', 'CN'].includes(res.locale)) {
+        setSelectedLanguage(res.locale);
+        localStorage.setItem('selectedLanguage', res.locale);
+      }
+    });
+  }, []);
 
   // Auto-update functionality
   useEffect(() => {
