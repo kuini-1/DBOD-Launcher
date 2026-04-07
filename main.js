@@ -5,6 +5,10 @@ const { spawn } = require('child_process');
 const fs = require('fs-extra');
 const AdmZip = require('adm-zip');
 const axios = require('axios');
+const {
+  GAME_UPDATE_STATUS_KEYS: STATUS_KEY,
+  GAME_UPDATE_TONE: STATUS_TONE,
+} = require('./shared/gameUpdateStatusIpc');
 
 const VALID_GAME_LOCALES = new Set(['EN', 'KR', 'CN']);
 
@@ -41,12 +45,23 @@ function formatGameVersionFile(version, locale) {
   return `${version}\n${loc}\n`;
 }
 
+let mainWindow;
+
+function sendGameUpdateStatus(key, params = {}, tone, updating) {
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('game-update-status', {
+      key,
+      params: params || {},
+      tone,
+      updating: Boolean(updating),
+    });
+  }
+}
+
 // Auto update function
 async function performAutoGameUpdate() {
   console.log('=== AUTO-UPDATE FUNCTION CALLED ===');
-  if (mainWindow && mainWindow.webContents) {
-    mainWindow.webContents.send('game-update-status', 'Checking for updates...');
-  }
+  sendGameUpdateStatus(STATUS_KEY.AUTO_CHECKING, {}, STATUS_TONE.PROGRESS, true);
   
   try {
     const baseUrl = 'https://updates.dbod.cc';
@@ -54,14 +69,20 @@ async function performAutoGameUpdate() {
     const gameDir = getGameDirForLauncher();
     if (process.env.PORTABLE_EXECUTABLE_DIR) {
       console.log('Using PORTABLE_EXECUTABLE_DIR:', gameDir);
-      if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('game-update-status', `Using PORTABLE_EXECUTABLE_DIR: ${gameDir}`);
-      }
+      sendGameUpdateStatus(
+        STATUS_KEY.USING_PORTABLE_DIR,
+        { path: gameDir },
+        STATUS_TONE.INFO,
+        true
+      );
     } else {
       console.log('Using executable directory:', gameDir);
-      if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('game-update-status', `Using executable directory: ${gameDir}`);
-      }
+      sendGameUpdateStatus(
+        STATUS_KEY.USING_EXEC_DIR,
+        { path: gameDir },
+        STATUS_TONE.INFO,
+        true
+      );
     }
 
     const versionFile = path.join(gameDir, 'game-version.txt');
@@ -107,15 +128,21 @@ async function performAutoGameUpdate() {
     }
     
     if (availableUpdates.length > 0) {
-      if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('game-update-status', `Found ${availableUpdates.length} updates available`);
-      }
-      
+      sendGameUpdateStatus(
+        STATUS_KEY.FOUND_UPDATES,
+        { count: availableUpdates.length },
+        STATUS_TONE.PROGRESS,
+        true
+      );
+
       // Download and install each update
       for (const update of availableUpdates) {
-        if (mainWindow && mainWindow.webContents) {
-          mainWindow.webContents.send('game-update-status', `Downloading update ${update.version}...`);
-        }
+        sendGameUpdateStatus(
+          STATUS_KEY.DOWNLOADING_UPDATE_VERSION,
+          { version: update.version },
+          STATUS_TONE.PROGRESS,
+          true
+        );
         
         // Download the update
         const downloadPath = path.join(gameDir, 'game-update.zip');
@@ -164,9 +191,12 @@ async function performAutoGameUpdate() {
         const localizePackPath = path.join(localizeTaiwanPath, 'pack');
 
         try {
-          if (mainWindow && mainWindow.webContents) {
-            mainWindow.webContents.send('game-update-status', `Extracting update ${update.version}...`);
-          }
+          sendGameUpdateStatus(
+            STATUS_KEY.EXTRACTING_UPDATE_VERSION,
+            { version: update.version },
+            STATUS_TONE.PROGRESS,
+            true
+          );
 
           const zip = new AdmZip(downloadPath);
           const entries = zip.getEntries();
@@ -281,33 +311,27 @@ async function performAutoGameUpdate() {
         // Update the version file (keep locale line)
         await fs.writeFile(versionFile, formatGameVersionFile(update.version, selectedLanguage));
         
-        if (mainWindow && mainWindow.webContents) {
-          mainWindow.webContents.send('game-update-status', `Update ${update.version} completed successfully`);
-        }
-        
+        sendGameUpdateStatus(
+          STATUS_KEY.UPDATE_VERSION_COMPLETE,
+          { version: update.version },
+          STATUS_TONE.PROGRESS,
+          true
+        );
+
       } // End of for loop
-      
-      if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('game-update-status', 'All updates completed successfully');
-      }
-      
+
+      sendGameUpdateStatus(STATUS_KEY.ALL_UPDATES_COMPLETE, {}, STATUS_TONE.SUCCESS, false);
     } else {
-      if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('game-update-status', 'No updates available');
-      }
+      sendGameUpdateStatus(STATUS_KEY.NO_UPDATES, {}, STATUS_TONE.SUCCESS, false);
     } // End of if (availableUpdates.length > 0)
-    
+
   } catch (error) {
     console.error('Auto-update failed:', error);
     console.error('Error stack:', error.stack);
-    if (mainWindow && mainWindow.webContents) {
-      const message = error && error.message ? error.message : 'Unknown error';
-      mainWindow.webContents.send('game-update-status', `Game auto-update failed: ${message}`);
-    }
+    const message = error && error.message ? error.message : 'Unknown error';
+    sendGameUpdateStatus(STATUS_KEY.AUTO_FAILED, { message }, STATUS_TONE.ERROR, false);
   }
 }
-
-let mainWindow;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -867,9 +891,12 @@ ipcMain.handle('close-window', () => {
 // Game Update functionality
 ipcMain.handle('check-game-update', async (event, updateUrl) => {
   try {
-    if (mainWindow && mainWindow.webContents) {
-      mainWindow.webContents.send('game-update-status', 'Checking for game updates...');
-    }
+    sendGameUpdateStatus(
+      STATUS_KEY.MANUAL_CHECKING_GAME,
+      {},
+      STATUS_TONE.PROGRESS,
+      true
+    );
     
     // In a real implementation, you would check the server for available updates
     // For now, we'll simulate checking for updates
@@ -892,9 +919,12 @@ ipcMain.handle('check-game-update', async (event, updateUrl) => {
 
 ipcMain.handle('get-available-updates', async (event, baseUrl, selectedLanguage) => {
   try {
-    if (mainWindow && mainWindow.webContents) {
-      mainWindow.webContents.send('game-update-status', 'Checking for available updates...');
-    }
+    sendGameUpdateStatus(
+      STATUS_KEY.MANUAL_CHECKING_AVAILABLE,
+      {},
+      STATUS_TONE.PROGRESS,
+      true
+    );
     
     const gameDir = getGameDirForLauncher();
     const versionFile = path.join(gameDir, 'game-version.txt');
@@ -951,9 +981,12 @@ ipcMain.handle('get-available-updates', async (event, baseUrl, selectedLanguage)
 
 ipcMain.handle('download-game-update', async (event, updateUrl) => {
   try {
-    if (mainWindow && mainWindow.webContents) {
-      mainWindow.webContents.send('game-update-status', 'Downloading game update...');
-    }
+    sendGameUpdateStatus(
+      STATUS_KEY.MANUAL_DOWNLOADING_GAME,
+      {},
+      STATUS_TONE.PROGRESS,
+      true
+    );
 
     const gameDir = getGameDirForLauncher();
     const downloadPath = path.join(gameDir, 'game-update.zip');
@@ -996,9 +1029,12 @@ ipcMain.handle('download-game-update', async (event, updateUrl) => {
 
 ipcMain.handle('extract-game-update', async (event, downloadPath, selectedLanguage, baseUrl) => {
   try {
-    if (mainWindow && mainWindow.webContents) {
-      mainWindow.webContents.send('game-update-status', 'Extracting game update...');
-    }
+    sendGameUpdateStatus(
+      STATUS_KEY.MANUAL_EXTRACTING,
+      {},
+      STATUS_TONE.PROGRESS,
+      true
+    );
 
     const gameDir = getGameDirForLauncher();
     const extractPath = gameDir;
@@ -1033,9 +1069,12 @@ ipcMain.handle('extract-game-update', async (event, downloadPath, selectedLangua
     const languageUrl = `${baseUrl}/localize/${languageFile}`;
     
     try {
-      if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('game-update-status', `Downloading ${selectedLanguage} localization...`);
-      }
+      sendGameUpdateStatus(
+        STATUS_KEY.DOWNLOADING_LOCALIZATION,
+        { lang: selectedLanguage },
+        STATUS_TONE.PROGRESS,
+        true
+      );
       
       const languageResponse = await axios({
         method: 'GET',
@@ -1059,9 +1098,12 @@ ipcMain.handle('extract-game-update', async (event, downloadPath, selectedLangua
       // Clean up language download
       await fs.remove(languageDownloadPath);
       
-      if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('game-update-status', `${selectedLanguage} localization downloaded successfully`);
-      }
+      sendGameUpdateStatus(
+        STATUS_KEY.LOCALIZATION_OK,
+        { lang: selectedLanguage },
+        STATUS_TONE.SUCCESS,
+        true
+      );
     } catch (error) {
       console.warn(`Failed to download ${selectedLanguage} localization: ${error.message}`);
       // Continue with the update even if language file fails
@@ -1085,9 +1127,12 @@ ipcMain.handle('extract-game-update', async (event, downloadPath, selectedLangua
 
 ipcMain.handle('install-game-update', async (event, version) => {
   try {
-    if (mainWindow && mainWindow.webContents) {
-      mainWindow.webContents.send('game-update-status', 'Installing game update...');
-    }
+    sendGameUpdateStatus(
+      STATUS_KEY.MANUAL_INSTALLING,
+      {},
+      STATUS_TONE.PROGRESS,
+      true
+    );
 
     const gameDir = getGameDirForLauncher();
     const packPath = path.join(gameDir, 'pack');
@@ -1128,9 +1173,12 @@ ipcMain.handle('install-game-update', async (event, version) => {
 
 ipcMain.handle('perform-game-update', async (event, baseUrl, selectedLanguage) => {
   try {
-    if (mainWindow && mainWindow.webContents) {
-      mainWindow.webContents.send('game-update-status', 'Starting game update...');
-    }
+    sendGameUpdateStatus(
+      STATUS_KEY.MANUAL_STARTING,
+      {},
+      STATUS_TONE.PROGRESS,
+      true
+    );
 
     // Step 1: Get available updates
     const updatesResult = await ipcMain.handle('get-available-updates', event, baseUrl, selectedLanguage);
@@ -1147,9 +1195,12 @@ ipcMain.handle('perform-game-update', async (event, baseUrl, selectedLanguage) =
 
     // Step 2: Download and install each update
     for (const update of updatesResult.availableUpdates) {
-      if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('game-update-status', `Downloading update ${update.version}...`);
-      }
+      sendGameUpdateStatus(
+        STATUS_KEY.DOWNLOADING_UPDATE_VERSION,
+        { version: update.version },
+        STATUS_TONE.PROGRESS,
+        true
+      );
 
       // Download the update
       const downloadResult = await ipcMain.handle('download-game-update', event, update.url);

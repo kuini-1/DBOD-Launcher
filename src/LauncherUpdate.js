@@ -1,32 +1,30 @@
 import React, { useState, useEffect } from 'react';
+import { useI18n } from './i18n/I18nContext';
 
 const LauncherUpdate = () => {
+  const { t } = useI18n();
   const [launcherUpdate, setLauncherUpdate] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadError, setDownloadError] = useState(null);
 
   useEffect(() => {
-    // Listen for launcher update notifications
     window.electronAPI.onLauncherUpdateAvailable((event, updateInfo) => {
       console.log('Launcher update available:', updateInfo);
       setLauncherUpdate(updateInfo);
     });
 
-    // Listen for download progress
     window.electronAPI.onLauncherUpdateProgress((event, progress) => {
       console.log('Download progress:', progress);
       setDownloadProgress(progress);
     });
 
-    // Listen for download errors
     window.electronAPI.onLauncherUpdateError((event, error) => {
       console.error('Download error:', error);
       setDownloadError(error);
       setIsDownloading(false);
     });
 
-    // Clean up listeners
     return () => {
       window.electronAPI.removeAllListeners('launcher-update-available');
       window.electronAPI.removeAllListeners('launcher-update-progress');
@@ -45,11 +43,10 @@ const LauncherUpdate = () => {
           throw new Error('Update URL is missing');
         }
         await window.electronAPI.downloadLauncherUpdate(launcherUpdate.url);
-        // The app will quit and restart with the new version
       } catch (error) {
         console.error('Failed to download launcher update:', error);
         setIsDownloading(false);
-        setDownloadError(error.message || 'Download failed');
+        setDownloadError(error.message || t('launcherUpdate.downloadFailed'));
       }
     }
   };
@@ -63,37 +60,42 @@ const LauncherUpdate = () => {
     <div className="launcher-update-overlay">
       <div className="launcher-update-modal">
         <div className="update-header">
-          <h3>🚀 Launcher Update</h3>
-          <p className="update-version">Version {launcherUpdate.version}</p>
+          <h3>{t('launcherUpdate.title')}</h3>
+          <p className="update-version">
+            {t('launcherUpdate.version', { version: launcherUpdate.version })}
+          </p>
         </div>
         <div className="update-content">
-          <p>A new version of the launcher is available.</p>
-          
+          <p>{t('launcherUpdate.body')}</p>
+
           {isDownloading && (
             <div className="download-progress">
               <div className="progress-bar">
-                <div 
+                <div
                   className="progress-fill"
                   style={{ width: `${downloadProgress}%` }}
                 ></div>
               </div>
-              <p className="progress-text">Downloading... {downloadProgress}%</p>
+              <p className="progress-text">
+                {t('launcherUpdate.downloading', { percent: downloadProgress })}
+              </p>
             </div>
           )}
-          
+
           {downloadError && (
             <div className="download-error">
-              <p>Error: {downloadError}</p>
+              <p>{t('launcherUpdate.error', { message: downloadError })}</p>
             </div>
           )}
         </div>
         <div className="update-actions">
-          <button 
+          <button
+            type="button"
             className="update-button"
             onClick={handleLauncherUpdate}
             disabled={isDownloading}
           >
-            {isDownloading ? 'Downloading...' : 'Update Now'}
+            {isDownloading ? t('launcherUpdate.downloadingBtn') : t('launcherUpdate.updateNow')}
           </button>
         </div>
       </div>
@@ -101,4 +103,4 @@ const LauncherUpdate = () => {
   );
 };
 
-export default LauncherUpdate; 
+export default LauncherUpdate;
